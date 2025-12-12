@@ -2,20 +2,25 @@ import os
 import streamlit as st
 from openai import OpenAI
 
-# Get API key from Streamlit secrets (Cloud) or environment variable (local)
-try:
-    api_key = st.secrets["OPENAI_API_KEY"]
-except (KeyError, FileNotFoundError):
-    # Fall back to environment variable for local development
-    api_key = os.getenv("OPENAI_API_KEY")
+def get_openai_client():
+    """
+    Get OpenAI client with API key from Streamlit secrets (Cloud) or environment variable (local).
+    Initializes the client lazily to avoid import-time errors.
+    """
+    # Get API key from Streamlit secrets (Cloud) or environment variable (local)
+    try:
+        api_key = st.secrets["OPENAI_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        # Fall back to environment variable for local development
+        api_key = os.getenv("OPENAI_API_KEY")
 
-if not api_key:
-    raise ValueError(
-        "OPENAI_API_KEY not found. Please set it in Streamlit secrets (Cloud) or .env file (local)."
-    )
+    if not api_key:
+        raise ValueError(
+            "OPENAI_API_KEY not found. Please set it in Streamlit secrets (Cloud) or .env file (local)."
+        )
 
-# Initialize OpenAI client
-client = OpenAI(api_key=api_key)
+    # Initialize and return OpenAI client
+    return OpenAI(api_key=api_key)
 
 def chat_with_ai_stream(message: str, conversation_history: list = None):
     """
@@ -49,6 +54,9 @@ Be friendly, informative, and provide practical travel advice."""
     messages.append({"role": "user", "content": message})
     
     try:
+        # Get OpenAI client
+        client = get_openai_client()
+        
         # Call OpenAI API with streaming
         stream = client.chat.completions.create(
             model="gpt-4.1",
