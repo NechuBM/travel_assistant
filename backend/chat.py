@@ -1,12 +1,17 @@
 import os
+import streamlit as st
 from openai import OpenAI
 
-# Get API key from environment (loaded by app.py)
-api_key = os.getenv("OPENAI_API_KEY")
+# Get API key from Streamlit secrets (Cloud) or environment variable (local)
+try:
+    api_key = st.secrets["OPENAI_API_KEY"]
+except (KeyError, FileNotFoundError):
+    # Fall back to environment variable for local development
+    api_key = os.getenv("OPENAI_API_KEY")
 
 if not api_key:
     raise ValueError(
-        "OPENAI_API_KEY not found. Please set it in the .env file or as an environment variable."
+        "OPENAI_API_KEY not found. Please set it in Streamlit secrets (Cloud) or .env file (local)."
     )
 
 # Initialize OpenAI client

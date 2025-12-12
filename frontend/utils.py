@@ -12,12 +12,17 @@ def check_authentication():
     Returns True if authenticated, False otherwise.
     Shows login UI if not authenticated.
     Note: Authentication only persists during the current session.
-    The correct password is read from APP_PASSWORD environment variable.
+    The correct password is read from st.secrets (Streamlit Cloud) or APP_PASSWORD env var (local).
     """
-    # Get the correct password from environment variable
-    correct_password = os.getenv("APP_PASSWORD")
+    # Get the correct password from Streamlit secrets (Cloud) or environment variable (local)
+    try:
+        correct_password = st.secrets["APP_PASSWORD"]
+    except (KeyError, FileNotFoundError):
+        # Fall back to environment variable for local development
+        correct_password = os.getenv("APP_PASSWORD")
+    
     if not correct_password:
-        st.error("⚠️ APP_PASSWORD environment variable is not set. Please configure it in your .env file.")
+        st.error("⚠️ APP_PASSWORD is not configured. Please set it in Streamlit secrets (Cloud) or .env file (local).")
         st.stop()
     # Initialize authentication state
     if "authenticated" not in st.session_state:

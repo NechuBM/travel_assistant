@@ -8,24 +8,33 @@ A minimalistic chat application with an AI travel assistant built with Streamlit
 - **Main Chat Area**: Interactive chat interface with the AI travel assistant
 - **Backend**: OpenAI API integration with travel assistant role
 
-## Setup
+## Local Setup
 
 1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Create a `.env` file in the root directory and add your configuration:
-```bash
-# Copy the example file
-cp .env.example .env
+2. **Option A: Using `.env` file (recommended for local development)**
+   ```bash
+   # Create a .env file in the root directory
+   OPENAI_API_KEY=your-actual-api-key-here
+   APP_PASSWORD=your-secure-password-here
+   ```
 
-# Then edit .env and add your configuration
-OPENAI_API_KEY=your-actual-api-key-here
-APP_PASSWORD=your-secure-password-here
-```
+   **Option B: Using Streamlit secrets (mimics Cloud environment)**
+   ```bash
+   # Create .streamlit/secrets.toml
+   mkdir .streamlit
+   ```
+   
+   Add to `.streamlit/secrets.toml`:
+   ```toml
+   OPENAI_API_KEY = "your-actual-api-key-here"
+   APP_PASSWORD = "your-secure-password-here"
+   ```
 
-   Alternatively, you can set them as environment variables:
+   **Option C: Environment variables**
    ```bash
    # Windows PowerShell
    $env:OPENAI_API_KEY="your-api-key-here"
@@ -45,9 +54,24 @@ APP_PASSWORD=your-secure-password-here
 streamlit run app.py
 ```
 
+## Deployment to Streamlit Cloud
+
+1. Push your code to a GitHub repository (make sure `.env` is in `.gitignore`)
+
+2. Go to [share.streamlit.io](https://share.streamlit.io) and deploy your app
+
+3. In the Streamlit Cloud dashboard, go to **Settings** → **Secrets** and add:
+
+```toml
+OPENAI_API_KEY = "your-actual-api-key-here"
+APP_PASSWORD = "your-secure-password-here"
+```
+
+4. Save and your app will automatically restart with the secrets loaded
+
 ## Security
 
-- The app is password-protected. Set a strong `APP_PASSWORD` in your `.env` file
+- The app is password-protected. Set a strong `APP_PASSWORD` in your `.env` file (local) or Streamlit secrets (Cloud)
 - Never commit your `.env` file to version control
 - Conversation data is stored locally in `assets/conversations/` and excluded from git
 
