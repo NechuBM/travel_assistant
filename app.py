@@ -1,6 +1,8 @@
 import streamlit as st
 from pathlib import Path
 from dotenv import load_dotenv
+import uuid
+from datetime import datetime
 
 # Load environment variables from .env file BEFORE importing backend modules
 load_dotenv()
@@ -106,9 +108,23 @@ if prompt := st.chat_input("Ask me about travel..."):
     assistant_message = {"role": "assistant", "content": response}
     st.session_state.messages.append(assistant_message)
     
+    # Create a new conversation if one doesn't exist
+    if not st.session_state.current_conversation_id:
+        conversation_id = str(uuid.uuid4())
+        conversation_data = {
+            "id": conversation_id,
+            "title": "New Conversation",
+            "messages": st.session_state.messages.copy(),  # Use existing messages
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        st.session_state.conversations[conversation_id] = conversation_data
+        st.session_state.current_conversation_id = conversation_id
+        # Note: Don't clear st.session_state.messages here!
+        save_conversation(conversation_id, conversation_data)
+    
     # Save to storage and rerun to show the complete conversation
     if st.session_state.current_conversation_id:
-        from datetime import datetime
         conv_id = st.session_state.current_conversation_id
         st.session_state.conversations[conv_id]["messages"] = st.session_state.messages
         st.session_state.conversations[conv_id]["updated_at"] = datetime.now().isoformat()
