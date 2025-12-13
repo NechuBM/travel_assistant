@@ -6,11 +6,12 @@ from backend.tools import AVAILABLE_TOOLS, TOOL_FUNCTIONS
 # Tool-specific loading messages
 TOOL_MESSAGES = {
     "generate_packing_list": "🧳 Generating packing list...",
-    "get_weather_forecast": "🌤️ Fetching weather forecast..."
+    "get_weather_forecast": "🌤️ Fetching weather forecast...",
+    "generate_trip_plan": "🗺️ Creating your itinerary..."
 }
 
 # Tools that should always show output to user
-VISIBLE_TOOLS = ["generate_packing_list", "get_weather_forecast"]
+VISIBLE_TOOLS = ["generate_packing_list", "get_weather_forecast", "generate_trip_plan"]
 
 
 def _prepare_messages(system_prompt: str, conversation_history: list, user_message: str) -> list:
