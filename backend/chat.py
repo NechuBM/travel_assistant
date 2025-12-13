@@ -33,15 +33,10 @@ def chat_with_ai_stream(message: str, conversation_history: list = None):
     Yields:
         Chunks of the AI's response as strings
     """
-    # System prompt explaining the role
-    system_prompt = """You are a helpful travel assistant. Your role is to assist users with:
-- Travel planning and recommendations
-- Destination information and tips
-- Itinerary suggestions
-- Travel-related questions and advice
-- Booking guidance and travel tips
-
-Be friendly, informative, and provide practical travel advice."""
+    # Load system prompt from markdown file
+    prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'chat_assistant.md')
+    with open(prompt_path, 'r', encoding='utf-8') as f:
+        system_prompt = f.read().strip()
     
     # Prepare messages
     messages = [{"role": "system", "content": system_prompt}]
