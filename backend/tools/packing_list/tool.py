@@ -1,7 +1,7 @@
 """Packing list generation tool for travel planning."""
 
 import os
-from backend.utils import get_openai_client
+from backend.utils import get_openai_client, get_runtime_context
 
 # Tool definition for OpenAI function calling
 TOOL_DEFINITION = {
@@ -28,6 +28,10 @@ TOOL_DEFINITION = {
                 "season": {
                     "type": "string",
                     "description": "Season or month of travel"
+                },
+                "weather_context": {
+                    "type": "string",
+                    "description": "Recent weather forecast data for the destination (if available). Include temperatures, conditions, and precipitation."
                 }
             },
             "required": ["destination"]
@@ -36,7 +40,7 @@ TOOL_DEFINITION = {
 }
 
 
-def generate_packing_list(destination: str, duration_days: int = None, activities: list = None, season: str = None):
+def generate_packing_list(destination: str, duration_days: int = None, activities: list = None, season: str = None, weather_context: str = None):
     """
     Generate a packing list using LLM based on destination and trip details.
     Streams the response as it's generated.
@@ -46,6 +50,7 @@ def generate_packing_list(destination: str, duration_days: int = None, activitie
         duration_days: Number of days (optional)
         activities: List of activities (optional)
         season: Season of travel (optional)
+        weather_context: Weather forecast data (optional)
     
     Yields:
         Chunks of the generated packing list
@@ -63,15 +68,18 @@ def generate_packing_list(destination: str, duration_days: int = None, activitie
         context_parts.append(f"Activities: {', '.join(activities)}")
     if season:
         context_parts.append(f"Season: {season}")
+    if weather_context:
+        context_parts.append(f"Weather forecast:\n{weather_context}")
     
     user_message = "\n".join(context_parts)
     
-    # Call LLM with streaming
+    # Call LLM with streaming (inject runtime context)
     client = get_openai_client()
     stream = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
+            {"role": "system", "content": get_runtime_context()},
             {"role": "user", "content": user_message}
         ],
         temperature=0.7,
