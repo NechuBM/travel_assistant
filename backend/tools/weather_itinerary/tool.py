@@ -264,15 +264,42 @@ def get_weather_forecast(
     # Try to geocode and fetch weather
     geo_data = geocode_location(location)
     forecast_data = None
+    error_reason = None
     
-    if geo_data:
-        forecast_data = fetch_weather_forecast(
-            geo_data["lat"],
-            geo_data["lon"],
-            date_range["start"],
-            date_range["end"],
-            units
-        )
+    # Check if geocoding failed
+    if not geo_data:
+        error_reason = "location_not_found"
+    else:
+        # Check date constraints before fetching weather
+        from datetime import datetime, date
+        try:
+            start = datetime.strptime(date_range["start"], "%Y-%m-%d").date()
+            end = datetime.strptime(date_range["end"], "%Y-%m-%d").date()
+            today = date.today()
+            
+            days_until_start = (start - today).days
+            days_until_end = (end - today).days
+            
+            # Check for past dates
+            if days_until_end < 0:
+                error_reason = "past_dates"
+            # Check if start date is too far in the future
+            elif days_until_start > 14:
+                error_reason = "too_far_future"
+            else:
+                # Dates are valid, try to fetch weather
+                forecast_data = fetch_weather_forecast(
+                    geo_data["lat"],
+                    geo_data["lon"],
+                    date_range["start"],
+                    date_range["end"],
+                    units
+                )
+                # If still None, it's an API error
+                if not forecast_data:
+                    error_reason = "api_error"
+        except ValueError:
+            error_reason = "invalid_date_format"
     
     # Build user message for LLM
     if forecast_data:
@@ -288,8 +315,18 @@ Weather Data:
 {format_weather_summary(forecast_data)}"""
         
     else:
-        # Fallback: no weather data available
-        yield "\n⚠️ **Weather forecast unavailable** - I couldn't fetch live weather data for this location/dates.\n\n"
+        # Provide specific error message based on the reason
+        if error_reason == "location_not_found":
+            yield f"\n⚠️ **Weather forecast unavailable** - I couldn't find the location '{location}'. Please try a different city name or include the country (e.g., 'Paris, France').\n\n"
+        elif error_reason == "past_dates":
+            yield f"\n⚠️ **Weather forecast unavailable** - The dates you requested ({date_range['start']} to {date_range['end']}) are in the past. I can only provide forecasts for current and future dates.\n\n"
+        elif error_reason == "too_far_future":
+            yield f"\n⚠️ **Weather forecast unavailable** - The start date ({date_range['start']}) is too far in the future. I can only provide weather forecasts up to **14 days** ahead. Please try dates closer to today.\n\n"
+        elif error_reason == "invalid_date_format":
+            yield f"\n⚠️ **Weather forecast unavailable** - Invalid date format. Dates should be in YYYY-MM-DD format.\n\n"
+        else:
+            # Generic API error
+            yield f"\n⚠️ **Weather forecast unavailable** - I couldn't fetch live weather data for {location}. This might be a temporary API issue. Please try again later.\n\n"
         return
     
     # Call LLM with streaming to format the weather nicely
