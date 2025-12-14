@@ -49,20 +49,37 @@ def check_authentication():
 
 
 def create_new_conversation():
-    """Create a new conversation"""
+    """Create a new conversation with a welcome message"""
     conversation_id = str(uuid.uuid4())
+    
+    # Welcome message for new conversations
+    welcome_message = {
+        "role": "assistant",
+        "content": """👋 Welcome to your AI Travel Assistant!
+
+I'm here to help you plan your perfect trip. I can help you with:
+
+- 🗺️ **Trip Planning** - Create detailed itineraries for your destinations
+- 🌤️ **Weather Forecasts** - Get weather information for your travel dates
+- 🧳 **Packing Lists** - Generate customized packing lists based on your trip
+
+Just tell me where you'd like to go, when you're traveling, or what you need help with!"""
+    }
+    
     conversation_data = {
         "id": conversation_id,
         "title": "New Conversation",
-        "messages": [],
+        "messages": [welcome_message],
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat()
     }
     st.session_state.conversations[conversation_id] = conversation_data
     st.session_state.current_conversation_id = conversation_id
-    st.session_state.messages = []
+    st.session_state.messages = [welcome_message]
     # Save to storage
     save_conversation(conversation_id, conversation_data)
+    # Trigger rerun to display the welcome message
+    st.rerun()
 
 
 def load_conversation(conversation_id):
