@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 from backend.utils import get_openai_client, get_runtime_context
 from backend.tools import AVAILABLE_TOOLS, TOOL_FUNCTIONS
 
@@ -12,6 +13,18 @@ TOOL_MESSAGES = {
 
 # Tools that should always show output to user
 VISIBLE_TOOLS = ["generate_packing_list", "get_weather_forecast", "generate_trip_plan"]
+
+
+def _get_tool_signature(function_name: str, function_args: dict) -> str:
+    """
+    Create a unique signature for a tool call based on name and arguments.
+    Used for deduplication to prevent calling the same tool with same args.
+    """
+    # Sort args to ensure consistent hashing
+    args_str = json.dumps(function_args, sort_keys=True)
+    signature = f"{function_name}:{args_str}"
+    # Return hash for compact comparison
+    return hashlib.md5(signature.encode()).hexdigest()
 
 
 def _prepare_messages(system_prompt: str, conversation_history: list, user_message: str) -> list:
@@ -147,7 +160,6 @@ def _execute_tool_calls(tool_calls: list, messages: list):
     """Execute tool calls, stream output to user, and append tool messages to conversation."""
     # Enforce single tool execution - only process first tool
     if len(tool_calls) > 1:
-        print(f"[TOOL] Enforcing single execution: {tool_calls[0]['function']['name']} (skipping {len(tool_calls)-1} other(s))")
         tool_calls_to_execute = tool_calls[:1]
     else:
         tool_calls_to_execute = tool_calls
@@ -206,16 +218,29 @@ def chat_with_ai_stream(message: str, conversation_history: list = None):
     try:
         client = get_openai_client()
         last_tool_was_visible = False
+        tools_called_history = []  # Track tool calls for deduplication: [(name, args_hash), ...]
+        tools_called_names = set()  # Track which tools have been called by name
         
         for round_count in range(1, 6):  # Max 5 rounds
+            # Filter out tools that have already been called
+            available_tools_filtered = [
+                tool for tool in AVAILABLE_TOOLS 
+                if tool['function']['name'] not in tools_called_names
+            ]
+            
             # Call LLM
-            stream = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                temperature=0.7,
-                tools=AVAILABLE_TOOLS,
-                stream=True
-            )
+            llm_params = {
+                "model": "gpt-4o",
+                "messages": messages,
+                "temperature": 0.7,
+                "stream": True
+            }
+            
+            # Only include tools if there are still uncalled tools available
+            if available_tools_filtered:
+                llm_params["tools"] = available_tools_filtered
+            
+            stream = client.chat.completions.create(**llm_params)
             
             # Collect response and tool calls
             full_response = ""
@@ -247,11 +272,27 @@ def chat_with_ai_stream(message: str, conversation_history: list = None):
             
             # If tool calls: execute them and loop
             if tool_calls:
-                print(f"[CHAT] Round {round_count} → {len(tool_calls)} tool(s): {[tc['function']['name'] for tc in tool_calls]}")
-                
                 # Enforce single tool execution
                 tool_calls_to_execute = tool_calls[:1] if len(tool_calls) > 1 else tool_calls
                 executed_tool_name = tool_calls_to_execute[0]['function']['name']
+                executed_tool_args = json.loads(tool_calls_to_execute[0]['function']['arguments'])
+                
+                # DEDUPLICATION CHECK: Has this exact tool been called before?
+                tool_signature = _get_tool_signature(executed_tool_name, executed_tool_args)
+                if tool_signature in tools_called_history:
+                    # Add a system message to explain what happened
+                    messages.append({
+                        "role": "system",
+                        "content": f"The tool '{executed_tool_name}' was already called with these exact arguments earlier in this conversation. The results are already available above. Please provide a final response to the user without calling this tool again."
+                    })
+                    
+                    # Mark this tool as called so it won't be available next round
+                    tools_called_names.add(executed_tool_name)
+                    continue
+                
+                # Record this tool call signature and name
+                tools_called_history.append(tool_signature)
+                tools_called_names.add(executed_tool_name)
                 
                 # Add assistant message with tool call
                 _add_assistant_message_with_tool_calls(messages, full_response, tool_calls_to_execute)
@@ -260,19 +301,17 @@ def chat_with_ai_stream(message: str, conversation_history: list = None):
                 for chunk in _execute_tool_calls(tool_calls_to_execute, messages):
                     yield chunk
                 
-                # Track if this tool was visible (to suppress next response)
-                last_tool_was_visible = executed_tool_name in VISIBLE_TOOLS
+                # Track if this tool was visible
+                is_visible_tool = executed_tool_name in VISIBLE_TOOLS
+                last_tool_was_visible = is_visible_tool
                 
                 # Loop again
                 continue
             
             # No tool calls: we're done
             else:
-                if last_tool_was_visible:
-                    print(f"[CHAT] Suppressed redundant response after visible tool")
                 break
     
     except Exception as e:
-        print(f"Error: {str(e)}")
         yield f"Error: {str(e)}"
 
